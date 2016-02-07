@@ -1,9 +1,13 @@
 ﻿############# Many of the sleep timers could be fixed by properly targetting a DC
 
-##### This script requires the Microsoft Online Services Sign-In Assistant, as well as the Azure Active Directory Module for Powershell
-
 
 #### could be improved by running Azure commands on remote machine, rather than relying upon locally installed components to run. Invoke-Command would be better.
+
+## Load functions from other scripts
+
+. ".\OUPicker.ps1"
+Write-Host "Loaded OUPicker.ps1"
+
 
 ## Set servers which this script can connect to
 $domaincontroller = "server01.domain.local"
@@ -97,11 +101,10 @@ if ($result -eq "0") {
     } else { 
 }
 
-
 $managerlookup = Read-Host -Prompt "Who does this employee report to? Searching by first and last name works best"
-
 $otheruserlookup = Read-Host -Prompt "Who should we copy security permissions from? Searching by first and last name works best"
-
+Write-Host "Where should we place the user?" -ForegroundColor Red
+$OU = Browse-AD
 Write-Host "Where should we send an email notification to? The direct manager will be automatically CC'd." -ForegroundColor Red
 $emailaddress = Read-Host -Prompt "Personal Email Address"
 
@@ -115,7 +118,7 @@ $emailaddress = Read-Host -Prompt "Personal Email Address"
 ## This generates a secure password, and store it as a variable
 
 Add-Type -AssemblyName System.Web
-$password = [System.Web.Security.Membership]::GeneratePassword(12,5)
+$password = [System.Web.Security.Membership]::GeneratePassword(12,3)
 
 
 
@@ -131,7 +134,7 @@ Import-PSSession $Session
 ## Create Mailbox
 
 Write-Host "Creating mailbox..." -ForegroundColor Red
-New-RemoteMailbox -FirstName $FirstName -LastName $LastName -Initials $Initials -Name "$FirstName $LastName" -DisplayName "$FirstName $LastName" -OnPremisesOrganizationalUnit domain.local/USERS/Users -Password (ConvertTo-SecureString -AsPlainText "$password" -Force) -UserPrincipalName "$userPrincipalName" -Archive -DomainController $domaincontroller
+New-RemoteMailbox -FirstName $FirstName -LastName $LastName -Initials $Initials -Name "$FirstName $LastName" -DisplayName "$FirstName $LastName" -OnPremisesOrganizationalUnit $OU -Password (ConvertTo-SecureString -AsPlainText "$password" -Force) -UserPrincipalName "$userPrincipalName" -Archive -DomainController $domaincontroller
 Remove-PSSession $Session
 
 
@@ -158,7 +161,7 @@ $managermobile = Get-ADUser -LDAPFilter "(name=$managerlookup)" -Properties Mobi
 $managername = Get-ADUser -LDAPFilter "(name=$managerlookup)" | foreach { $_.name }
 Write-Host "You've selected $managername as the manager" -ForegroundColor Red
 
-## Set AD Attributes
+## Set AD Attributes ######## This will fail if no "phone" numbers exist
 Set-ADUser -Identity $sAMAccountName -Office $market -OfficePhone "$officephone $extension" -MobilePhone $cellphone -Fax $fax -HomeDrive "Q:" -HomeDirectory "$homefolder" -City $city -State $state -Company $company -Department $department -Title $usertitle -Manager $manager
 
 ## Set security groups
