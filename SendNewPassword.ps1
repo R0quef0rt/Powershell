@@ -1,26 +1,24 @@
 ﻿## This script was compiled to simplify the process of resetting a password, and getting it to the employee. 
 ## It was last updated on 2/4/2016
-## Created by R0quef0rt
-
+## Created by Roquefort
 
 ## Load Active Directory Powershell module
 Import-Module ActiveDirectory
-
-## Load Password generation component
-Add-Type -AssemblyName System.Web
 
 ## Load functions from other scripts
 
 . ".\ChooseMobileCarrier.ps1"
 Write-Host "Loaded ChooseMobileCarrier.ps1"
+. ".\New-SWRandomPassword.ps1"
+Write-Host "Loaded New-SWRandomPassword.ps1"
 
 
-## Set SMTP Server variables
-$smtpServer="relay.domain.com" 
-$from = "Service Desk <alerts@domain.com>" 
+## Set SMTP Server variables. 
+$smtpServer="mail.yourdomain.com" 
+$from = "Service Desk <alerts@yourdomain.com>" 
 
-## This uses the New-SWRandomPassword.ps1 cmdlet to generate a secure password, and store it as a variable
-$newpw = [System.Web.Security.Membership]::GeneratePassword(12,5)
+## This uses the New-SWRandomPassword.ps1 script to generate a secure password, and store it as a variable
+$newpw = New-SWRandomPassword -InputStrings abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 1234567890 -PasswordLength 12
 
 ## Prompt the user to send password over email or SMS
 $title = "Send Method"
@@ -65,6 +63,7 @@ $username = Read-Host "Please enter the sAMAccountName of the person whose accou
 
 ## Set AD password
 Set-ADAccountPassword -Identity $username -Reset -NewPassword (ConvertTo-SecureString -AsPlainText "$newpw" -Force) -Confirm
+Set-ADUser -Identity $username -ChangePasswordAtLogon $true
 
 ## Email Subject 
 $subject="Your password has been reset" 
@@ -98,7 +97,7 @@ Dear $username,
 </P>"
 
 ## SMS Body Set Here, Note You can use HTML, including Images. 
-$bodysms ="Your new company password is: [[ $newpw ]] (without brackets) To reset, navigate to <a href=https://account.activedirectory.windowsazure.com/ChangePassword.aspx>iforgot.domain.com</a>."
+$bodysms ="Your new password is: [[ $newpw ]] (without brackets) To reset, navigate to <a href=https://sso.amerisurg.com/adfs/portal/updatepassword>iforgot.amerisurg.com</a>."
 
 ## Send short or long message, depending on if email or SMS
     if (($result) -eq "0") { 
