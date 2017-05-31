@@ -1,5 +1,7 @@
 ﻿############# Many of the sleep timers could be fixed by properly targetting a DC
 
+##### This script requires the Microsoft Online Services Sign-In Assistant, as well as the Azure Active Directory Module for Powershell
+
 
 #### could be improved by running Azure commands on remote machine, rather than relying upon locally installed components to run. Invoke-Command would be better.
 
@@ -7,19 +9,21 @@
 
 . ".\OUPicker.ps1"
 Write-Host "Loaded OUPicker.ps1"
+. ".\ActiveDirectory\New-SWRandomPassword.ps1"
+Write-Host "Loaded New-SWRandomPassword.ps1"
 
 
 ## Set servers which this script can connect to
-$domaincontroller = "server01.domain.local"
-$exchangeserver = "server02.domain.local"
-$azureserver = "server03.domain.local"
+$domaincontroller = "server01.domain.com"
+$exchangeserver = "server02.domain.com"
+$azureserver = "server03.domain.com"
 
 ## Set SMTP Server variables
-$smtpServer="relay.domain.com" 
+$smtpServer="smtp.domain.com" 
 $from = "Service Desk <alerts@domain.com>" 
 
 ## Credentials for Azure
-Write-Host "Which credentials will you use for Azure? This probably isn't your admin account" -ForegroundColor Red
+Write-Host "Which credentials will you use for Azure?" -ForegroundColor Red
 $credential = Get-Credential
 
 
@@ -34,8 +38,8 @@ $officephone = Read-Host -Prompt "Office phone"
 $extension = Read-Host -Prompt "Office extension"
 $fax = Read-Host -Prompt "Fax number"
 $cellphone = Read-Host -Prompt "Cell phone"
-$homefolder = "\\domain.local\HomeFolders\$FirstName$LastName"
-$usertitle = Read-Host -Prompt "What is the employee's title" 
+$homefolder = "\\domain.com\HomeFolders\$FirstName$LastName"
+$usertitle = Read-Host -Prompt "What is the employee's title?" 
 
 ## These options could be more dynamic
 
@@ -49,29 +53,21 @@ $company = Read-Host -Prompt "Company"
 Write-Host "Please choose the user's primary market of operation" -ForegroundColor Red
 $title = "Send Method"
 $message = "Set primary market"
-$houstontx = New-Object System.Management.Automation.Host.ChoiceDescription "&Houston, TX", `
+$a = New-Object System.Management.Automation.Host.ChoiceDescription "&A", `
     "Houston, TX"
-$dallastx = New-Object System.Management.Automation.Host.ChoiceDescription "&Dallas, TX", `
+$b = New-Object System.Management.Automation.Host.ChoiceDescription "&B", `
     "Dallas, TX"
-$beaumonttx = New-Object System.Management.Automation.Host.ChoiceDescription "&Beaumont, TX", `
+$c = New-Object System.Management.Automation.Host.ChoiceDescription "&C", `
     "Beaumont, TX"
-$austintx = New-Object System.Management.Automation.Host.ChoiceDescription "&Austin, TX", `
-    "Austin, TX"
-$corpuschristitx = New-Object System.Management.Automation.Host.ChoiceDescription "&Corpus Christi, TX", `
-    "Corpus Christi, TX"
-$sanantoniotx = New-Object System.Management.Automation.Host.ChoiceDescription "&San Antonio, TX", `
-    "San Antonio, TX"
-$options = [System.Management.Automation.Host.ChoiceDescription[]]($houstontx, $dallastx, $beaumonttx, $austintx, $corpuschristitx, $sanantoniotx)
+
+$options = [System.Management.Automation.Host.ChoiceDescription[]]($a, $b, $c)
 $result = $host.ui.PromptForChoice($title, $message, $options, 0)
  
 switch ($result)
     {
-        0 {"You set Houston, TX."}
+        0 {"You set Houston, TX"}
         1 {"You set Dallas, TX."}
         2 {"You set Beaumont, TX."}
-        3 {"You set Austin, TX."}
-        4 {"You set Corpus Christi, TX."}
-        5 {"You set San Antonio, TX."}
 }
 
 if ($result -eq "0") {
@@ -86,25 +82,16 @@ if ($result -eq "0") {
     $market = "Beaumont, TX"
     $city = "Beaumont"
     $state = "TX"
-    } elseif ($result -eq "3") {
-    $market = "Austin, TX"
-    $city = "Austin"
-    $state = "TX"
-    } elseif ($result -eq "4") {
-    $market = "Corpus Christi, TX"
-    $city = "Corpus Christi"
-    $state = "TX"
-    } elseif ($result -eq "5") {
-    $market = "San Antonio, TX"
-    $city = "San Antonio"
-    $state = "TX"
     } else { 
 }
 
-$managerlookup = Read-Host -Prompt "Who does this employee report to? Searching by first and last name works best"
-$otheruserlookup = Read-Host -Prompt "Who should we copy security permissions from? Searching by first and last name works best"
 Write-Host "Where should we place the user?" -ForegroundColor Red
 $OU = Browse-AD
+
+$managerlookup = Read-Host -Prompt "Who does this employee report to? Searching by first and last name works best"
+
+$otheruserlookup = Read-Host -Prompt "Who should we copy security permissions from? Searching by first and last name works best"
+
 Write-Host "Where should we send an email notification to? The direct manager will be automatically CC'd." -ForegroundColor Red
 $emailaddress = Read-Host -Prompt "Personal Email Address"
 
@@ -115,10 +102,8 @@ $emailaddress = Read-Host -Prompt "Personal Email Address"
 
 
 
-## This generates a secure password, and store it as a variable
-
-Add-Type -AssemblyName System.Web
-$password = [System.Web.Security.Membership]::GeneratePassword(12,3)
+## This uses the New-SWRandomPassword.ps1 script to generate a secure password, and store it as a variable
+$password = New-SWRandomPassword -InputStrings abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 1234567890 -PasswordLength 12
 
 
 
@@ -134,7 +119,7 @@ Import-PSSession $Session
 ## Create Mailbox
 
 Write-Host "Creating mailbox..." -ForegroundColor Red
-New-RemoteMailbox -FirstName $FirstName -LastName $LastName -Initials $Initials -Name "$FirstName $LastName" -DisplayName "$FirstName $LastName" -OnPremisesOrganizationalUnit $OU -Password (ConvertTo-SecureString -AsPlainText "$password" -Force) -UserPrincipalName "$userPrincipalName" -Archive -DomainController $domaincontroller
+New-RemoteMailbox -FirstName $FirstName -LastName $LastName -Initials $Initials -Name "$FirstName $LastName" -DisplayName "$FirstName $LastName" -OnPremisesOrganizationalUnit $OU -Password (ConvertTo-SecureString -AsPlainText "$password" -Force) -ResetPasswordOnNextLogon $true -UserPrincipalName "$userPrincipalName" -Archive -DomainController $domaincontroller
 Remove-PSSession $Session
 
 
@@ -148,7 +133,7 @@ Write-Host "Mailbox created. Connecting to the local Active Directory environmen
 Import-Module ActiveDirectory
 Write-Host "Waiting for Active Directory to update with the newly-created user account..." -ForegroundColor Red
 Start-Sleep -s 30
-$sAMAccountName = Get-ADUser -LDAPFilter "(userPrincipalName=$userPrincipalName)" | foreach { $_.samaccountname }
+$sAMAccountName = Get-ADUser -LDAPFilter "(userprincipalname=$userPrincipalName)" | foreach { $_.samaccountname }
 
 
 
@@ -156,13 +141,21 @@ $sAMAccountName = Get-ADUser -LDAPFilter "(userPrincipalName=$userPrincipalName)
 ##choose manager
 
 $manager = Get-ADUser -LDAPFilter "(name=$managerlookup)" | foreach { $_.distinguishedname }
-$manageremail = Get-ADUser  -Properties mail | select mail | foreach { $_.mail }
-$managermobile = Get-ADUser -LDAPFilter "(name=$managerlookup)" -Properties MobilePhone| select mobilephone | foreach { $_.mobilephone }
+$manageremail = Get-ADUser -LDAPFilter "(name=$managerlookup)" -Properties mail | select mail | foreach { $_.mail }
+$managermobile = get-ADUser -LDAPFilter "(name=$managerlookup)" -Properties MobilePhone| select mobilephone | foreach { $_.mobilephone }
 $managername = Get-ADUser -LDAPFilter "(name=$managerlookup)" | foreach { $_.name }
 Write-Host "You've selected $managername as the manager" -ForegroundColor Red
 
-## Set AD Attributes ######## This will fail if no "phone" numbers exist
-Set-ADUser -Identity $sAMAccountName -Office $market -OfficePhone "$officephone $extension" -MobilePhone $cellphone -Fax $fax -HomeDrive "Q:" -HomeDirectory "$homefolder" -City $city -State $state -Company $company -Department $department -Title $usertitle -Manager $manager
+## Set AD Attributes
+Set-ADUser -Identity $sAMAccountName -HomeDrive "Q:" -HomeDirectory "$homefolder" -City $city -State $state -Company $company -Department $department -Title $usertitle
+Try { Set-ADUser -Identity $sAMAccountName -OfficePhone "$officephone $extension" } 
+  Catch { write-host "Skipping office phone..." }
+Try { Set-ADUser -Identity $sAMAccountName -Identity $sAMAccountName -MobilePhone $cellphone } 
+  Catch { write-host "Skipping mobile phone..." }
+Try { Set-ADUser -Identity $sAMAccountName -Identity $sAMAccountName -Fax $fax } 
+  Catch { write-host "Skipping fax..." }
+Try { Set-ADUser -Identity $sAMAccountName -Manager $manager } 
+  Catch { write-host "Failed to find a the manager specified..." }
 
 ## Set security groups
 Write-Host "Setting security permissions..." -ForegroundColor Red
@@ -177,9 +170,9 @@ Get-ADUser -Identity $otherusersam -Properties memberof | Select-Object -ExpandP
 
 
 ## Runs a dirsync to move user into Azure
-schtasks.exe /Run /S "$azureserver" /TN "Azure AD Sync Scheduler" /I
-Write-Host "Waiting 60 seconds for local Active Directory to sync with Microsoft Azure..." -ForegroundColor Red
-Start-Sleep -s 60
+Invoke-Command -ComputerName $azureserver {Start-ADSyncSyncCycle -PolicyType Delta}
+Write-Host "Waiting 300 seconds for local Active Directory to sync with Microsoft Azure..." -ForegroundColor Red
+Start-Sleep -s 300
 
 
 
@@ -194,8 +187,8 @@ Start-Sleep -s 30
 
 Write-Host "Assigning EMS and Mobility licenses..." -ForegroundColor Red
 Set-MsolUser -userPrincipalName $userPrincipalName –UsageLocation US
-Set-MsolUserLicense -userPrincipalName $userPrincipalName –AddLicenses “aaapro:ENTERPRISEPACK”
-Set-MsolUserLicense -userPrincipalName $userPrincipalName –AddLicenses “aaapro:EMS”
+Set-MsolUserLicense -userPrincipalName $userPrincipalName –AddLicenses “tenent:ENTERPRISEPACK”
+Set-MsolUserLicense -userPrincipalName $userPrincipalName –AddLicenses “tenent:EMS”
 
 
 
@@ -211,6 +204,9 @@ Import-PSSession $ExchangeSession
 Write-Host "Turning on Litigation Hold..." -ForegroundColor Red
 Set-Mailbox $userPrincipalName -LitigationHoldEnabled $true -Force
 
+Write-Host "Disabling Clutter..." -ForegroundColor Red
+Set-Clutter -Identity $userPrincipalName -Enable $false
+
 Remove-PSSession $ExchangeSession
 
 
@@ -222,13 +218,13 @@ Remove-PSSession $ExchangeSession
 ## Notify via email the user and the direct manager
 
 ## Email Subject 
-$subject="$FirstName - Your company account has been set up!" 
+$subject="$FirstName - Your account has been set up!" 
    
 ## Email Body Set Here 
 $body =" 
 $FirstName,
 
-<p>Welcome to the team! Attached to this message is a quick-start guide detailing everything you need to know about accessing company resources at <company>. Below are the credentials you'll need to log in:
+<p>Welcome to the team! Attached to this message is a quick-start guide detailing everything you need to know about accessing company resources. Below are the credentials you'll need to log in:
 
 <p><u><b>Your logon information:</b></u><br>
 <b>Username</b>: $userPrincipalName<br>
@@ -251,26 +247,22 @@ $FirstName,
 <b>Mobile</b>: $managermobile<br>
 <b>Email</b>: $manageremail<br>
 
-<p>To change your password to something that's easier to remember, you may follow one of these two options:
-
-<p>1) If you have a company-issued workstation or laptop, press CTRL+ALT+DEL and choose 'Change a password', or;<br>
-2) If you are on a personal device or company phone, you may navigate to <a href=https://account.activedirectory.windowsazure.com/ChangePassword.aspx>iforgot.domain.com</a>.
-
-<p>Per the Employee Password Policy, your password must contain 12 characters, including a capital letter, a number, and a symbol. Passwords cannot contain consecutive, repeated characters (e.g., aaaaa11111) and cannot contain a string of characters that match previous passwords. Passwords may not contain all or part of a user's name or username.
-
 <p>If you have any questions, feel free to reach out to the Service Desk for assistance.
 
 <p>Thank you, <br>
 
 <p>Service Desk<br>
-832-804-8795<br>
+888-888-8888<br>
 support@domain.com<br>
-<a href=https://www.domain.com/support>www.domain.com/support</a>
 
 <p style=font-size:10px>This is a system-generated notice. Please do not respond.</p>  
 </P>"
 
 
 ## Sends a mail message, CC'ing the user and their manager
-Send-Mailmessage -smtpServer $smtpServer -from $from -to $emailaddress -cc "$manageremail", "$userPrincipalName" -subject $subject -body $body -Attachments "\\domain.local\all\Maintenance\Deployment\Scripts\NewHireDocument.pdf", "\\domain.local\all\Maintenance\Deployment\Scripts\SettingASPEmailOnYourPersonalPhone.pdf" -bodyasHTML -priority High
+Send-Mailmessage -smtpServer $smtpServer -from $from -to $emailaddress -cc "$manageremail", "$userPrincipalName" -subject $subject -body $body -Attachments ".\Docs\QuickStartGuide.pdf", ".\Docs\EmailSetup.pdf", ".\Docs\SurgicalCloudSetup.pdf" -bodyasHTML -priority High
 Write-Host "The new hire message has been sent! You're done!" -ForegroundColor Red
+
+
+Read-Host "Press any key to exit..."
+exit

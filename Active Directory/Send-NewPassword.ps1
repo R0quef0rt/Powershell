@@ -1,21 +1,23 @@
 ﻿## This script was compiled to simplify the process of resetting a password, and getting it to the employee. 
-## It was last updated on 2/4/2016
-## Created by Roquefort
+
 
 ## Load Active Directory Powershell module
 Import-Module ActiveDirectory
+
+## Load Password generation component
+Add-Type -AssemblyName System.Web
 
 ## Load functions from other scripts
 
 . ".\ChooseMobileCarrier.ps1"
 Write-Host "Loaded ChooseMobileCarrier.ps1"
-. ".\New-SWRandomPassword.ps1"
+. ".\ActiveDirectory\New-SWRandomPassword.ps1"
 Write-Host "Loaded New-SWRandomPassword.ps1"
 
 
-## Set SMTP Server variables. 
-$smtpServer="mail.yourdomain.com" 
-$from = "Service Desk <alerts@yourdomain.com>" 
+## Set SMTP Server variables
+$smtpServer="server.domain.com" 
+$from = "Service Desk <alerts@domain.com>" 
 
 ## This uses the New-SWRandomPassword.ps1 script to generate a secure password, and store it as a variable
 $newpw = New-SWRandomPassword -InputStrings abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 1234567890 -PasswordLength 12
@@ -70,20 +72,27 @@ $subject="Your password has been reset"
    
 ## Email Body Set Here 
 $bodyemail =" 
-Dear $username,
+Dear employee,
 
-<p>Your company password has been reset to the following:
+<p>Your password has been reset to the following:
 
 <p>$newpw
 
+<p> Please be sure to read the information below before attempting to making changes.
+
 <p>To change the password to something that's easier to remember, you may follow one of these two options:
 
-<p>1) If you have a company-issued workstation or laptop, press CTRL+ALT+DEL and choose 'Change a password', or;<br>
-2) If you are on a personal device or company phone, you may navigate to <a href=https://account.activedirectory.windowsazure.com/ChangePassword.aspx>iforgot.domain.com</a>.
+<p>1) If you have a company-issued workstation or laptop, press CTRL+ALT+DEL and choose 'Change a password'.
 
-<p>Per the Employee Password Policy, your password must contain 12 characters, including a capital letter, a number, and a symbol. Passwords cannot contain consecutive, repeated characters (e.g., aaaaa11111) and cannot contain a string of characters that match previous passwords. Passwords may not contain all or part of a user's name or username.
+<p>Per the Employee Password Policy, your password must contain the following:
+ <ul>
+	<li>400 characters</li>
+	<li>14 capital letter</li>
+	<li>24 numbers</li>
+	<li>And at least 7 symbols (ex. #@!*)</li>
+ </ul>
 
-<p>Note that if you have email on a cell phone, you will need to add the changed password to your phone's mail settings. On an iPhone, this can be found under 'Settings > Mail, Contacts, Calendars > Email'. Failure to update the password on your phone will halt email on it completely.
+<p>Note that if you have email on a cell phone, you will need to add the changed password to your phone's mail settings. On an iPhone, this can be found under 'Settings > Mail, Contacts, Calendars > ASP Email' and tapping your company email displayed at the top of the screen. Failure to update the password on your phone will halt email on it completely.
 
 <p>As always, if you have any questions, feel free to reach out to the Service Desk for assistance.
 
@@ -91,13 +100,12 @@ Dear $username,
 
 <p>Service Desk<br>
 888-888-8888<br>
-<a href=https://www.domain.com/support>www.domain.com/support</a>
 
 <p style=font-size:10px>This is a system-generated notice. Please do not respond.</p>  
 </P>"
 
 ## SMS Body Set Here, Note You can use HTML, including Images. 
-$bodysms ="Your new password is: [[ $newpw ]] (without brackets) To reset, navigate to <a href=https://sso.yourdomain.com/adfs/portal/updatepassword>iforgot.yourdomain.com</a>."
+$bodysms ="Your new password is:   $newpw   To reset, navigate to portal.domain.com"
 
 ## Send short or long message, depending on if email or SMS
     if (($result) -eq "0") { 
